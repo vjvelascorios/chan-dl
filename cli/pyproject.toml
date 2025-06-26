@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chan-downloader"
+version = "16.2.0"
+description = "Advanced 4chan thread and board downloader with modern HTML interface"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    {name = "vjvelascorios", email = "your.email@example.com"}
+]
+maintainers = [
+    {name = "vjvelascorios", email = "your.email@example.com"}
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Internet :: WWW/HTTP :: Browsers",
+    "Topic :: Multimedia :: Graphics",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+]
+keywords = ["4chan", "downloader", "imageboard", "scraper", "html", "offline", "archive"]
+dependencies = [
+    "basc-py4chan>=2.0.4",
+    "gallery-dl>=1.25.0", 
+    "tqdm>=4.64.0",
+]
+requires-python = ">=3.7"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black>=22.0",
+    "flake8>=4.0",
+    "mypy>=0.950",
+    "build>=0.8.0",
+    "twine>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/chan-downloader"
+Documentation = "https://github.com/yourusername/chan-downloader/blob/main/README.md"
+Repository = "https://github.com/yourusername/chan-downloader"
+"Bug Tracker" = "https://github.com/yourusername/chan-downloader/issues"
+
+[project.scripts]
+chan-dl = "chan_downloader.cli:main"
+4chan-dl = "chan_downloader.cli:main"
+chandownloader = "chan_downloader.cli:main"
+
+[tool.setuptools]
+packages = ["chan_downloader"]
+
+[tool.black]
+line-length = 88
+target-version = ['py37']
+
+[tool.mypy]
+python_version = "3.7"
+warn_return_any = true
+warn_unused_configs = true

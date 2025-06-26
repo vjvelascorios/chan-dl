@@ -1,0 +1,4 @@
+basc-py4chan
+# requests
+tqdm
+gallery-dl

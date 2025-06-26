@@ -1,0 +1,9 @@
+
+*.html
+*.jpg
+*.png
+*.webm
+*.mp4
+*.gif
+gallery-dl/
+4chan_downloader/
