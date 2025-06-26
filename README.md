@@ -1,4 +1,4 @@
-# 4chan Downloader v16.2
+# chan-dl
 
 Un descargador avanzado de hilos y boards de 4chan con interfaz HTML moderna y múltiples opciones de configuración.
 

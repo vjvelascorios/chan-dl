@@ -482,19 +482,14 @@ def download_thread(board_name, thread_id, theme='light', overwrite=False, sleep
         Console.print_error(f"Error procesando hilo {thread_id}: {str(e)}")
         return None
 
-def download_board(board_name, theme='light', overwrite=False, multithread=False, sleep_time=0, update_mode=False):
-    """Función mejorada de descarga de boards con soporte para actualización."""
+def download_board(board_name, theme='light', overwrite=False, multithread=False, sleep_time=0):
+    """Función mejorada de descarga de boards."""
     config = load_config()
     
     try:
         board = basc_py4chan.Board(board_name)
         all_thread_ids = board.get_all_thread_ids()
-        
-        if update_mode:
-            Console.print_header(f"🔄 Actualizando hilos de /{board_name}/ - {len(all_thread_ids)} hilos activos")
-        else:
-            Console.print_header(f"📋 Procesando /{board_name}/ - {len(all_thread_ids)} hilos encontrados")
-            
+        Console.print_header(f"📋 Procesando /{board_name}/ - {len(all_thread_ids)} hilos encontrados")
     except Exception as e:
         Console.print_error(f"Error obteniendo hilos de /{board_name}/: {e}")
         return
@@ -502,60 +497,32 @@ def download_board(board_name, theme='light', overwrite=False, multithread=False
     start_time = time.time()
     results = []
     
-    # Función auxiliar para procesar hilos
-    def process_thread(args):
-        board_name, thread_id, theme, overwrite, sleep_time, config, update_mode = args
-        if update_mode:
-            # En modo actualización, intentar actualizar primero
-            existing = find_existing_thread(board_name, thread_id)
-            if existing:
-                return update_thread(board_name, thread_id, theme, config)
-            else:
-                # Si no existe localmente, descargarlo normalmente
-                return download_thread(board_name, thread_id, theme, overwrite, sleep_time, config)
-        else:
-            return download_thread(board_name, thread_id, theme, overwrite, sleep_time, config)
-    
     if multithread:
         max_workers = config.get("max_workers", MAX_WORKERS)
         Console.print_info(f"🚀 Modo multi-hilo activado ({max_workers} workers)")
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            args = [(board_name, tid, theme, overwrite, sleep_time, config, update_mode) for tid in all_thread_ids]
-            desc = "Actualizando hilos" if update_mode else "Descargando hilos"
+            args = [(board_name, tid, theme, overwrite, sleep_time, config) for tid in all_thread_ids]
             results = list(tqdm(
-                executor.map(process_thread, args),
+                executor.map(lambda p: download_thread(*p), args),
                 total=len(all_thread_ids),
-                desc=desc
+                desc="Descargando hilos"
             ))
     else:
-        desc = "Actualizando hilos" if update_mode else "Descargando hilos"
         Console.print_info("⏳ Modo secuencial activado")
-        for thread_id in tqdm(all_thread_ids, desc=desc):
-            args = (board_name, thread_id, theme, overwrite, sleep_time, config, update_mode)
-            results.append(process_thread(args))
+        for thread_id in tqdm(all_thread_ids, desc="Descargando hilos"):
+            results.append(download_thread(board_name, thread_id, theme, overwrite, sleep_time, config))
     
     # Statistics
     elapsed = time.time() - start_time
     success_count = sum(1 for r in results if r is not None)
     
-    if update_mode:
-        updated_count = sum(1 for r in results if r and r.get("new_posts", 0) > 0)
-        total_new_posts = sum(r.get("new_posts", 0) for r in results if r)
-        
-        Console.print_header("\n📊 RESUMEN DE ACTUALIZACIÓN DE BOARD")
-        Console.print_success(f"✅ Hilos verificados: {len(all_thread_ids)}")
-        Console.print_success(f"🔄 Hilos actualizados: {updated_count}")
-        Console.print_success(f"📝 Nuevos posts totales: {total_new_posts}")
-        Console.print_info(f"⏱️  Tiempo total: {elapsed:.1f} segundos")
-        Console.print_info(f"⚡ Promedio: {elapsed/len(all_thread_ids):.1f}s por hilo")
-    else:
-        Console.print_header("\n📊 RESUMEN FINAL")
-        Console.print_success(f"✅ Hilos exitosos: {success_count}/{len(all_thread_ids)}")
-        Console.print_info(f"⏱️  Tiempo total: {elapsed:.1f} segundos")
-        Console.print_info(f"⚡ Promedio: {elapsed/len(all_thread_ids):.1f}s por hilo")
-        
-        # Create board index only in download mode
-        create_board_index(board_name, results, config)
+    Console.print_header("\n📊 RESUMEN FINAL")
+    Console.print_success(f"✅ Hilos exitosos: {success_count}/{len(all_thread_ids)}")
+    Console.print_info(f"⏱️  Tiempo total: {elapsed:.1f} segundos")
+    Console.print_info(f"⚡ Promedio: {elapsed/len(all_thread_ids):.1f}s por hilo")
+    
+    # Create board index
+    create_board_index(board_name, results, config)
 
 def find_existing_thread(board_name, thread_id):
     """Busca si un hilo ya existe y retorna su información."""
@@ -723,7 +690,6 @@ Ejemplos de uso:
   %(prog)s "URL" --config-set max_workers 10
   %(prog)s "https://boards.4chan.org/g/thread/12345" --update
   %(prog)s "https://boards.4chan.org/g/" --update-all
-  %(prog)s "https://boards.4chan.org/g/" --update-board -mt
         """)
     
     parser.add_argument("url", nargs='?', help="URL del hilo o board de 4chan")
@@ -740,9 +706,7 @@ Ejemplos de uso:
     parser.add_argument("--update", action="store_true",
                        help="Actualizar hilo existente con nuevos posts")
     parser.add_argument("--update-all", action="store_true",
-                       help="Actualizar solo hilos existentes localmente")
-    parser.add_argument("--update-board", action="store_true",
-                       help="Actualizar todos los hilos activos del board")
+                       help="Actualizar todos los hilos existentes de un board")
     parser.add_argument("--max-updates", type=int,
                        help="Límite de hilos a actualizar (solo con --update-all)")
     parser.add_argument("--config-set", nargs=2, metavar=("KEY", "VALUE"),
@@ -777,7 +741,7 @@ Ejemplos de uso:
         Console.print_success(f"Configuración actualizada: {key} = {value}")
         return
     
-    # Handle update operations for existing threads only
+    # Handle update operations
     if args.update_all:
         if not args.url:
             Console.print_error("Se requiere URL del board para --update-all")
@@ -828,13 +792,7 @@ Ejemplos de uso:
                 
     elif board_match:
         board_name = board_match.group(1)
-        
-        if args.update_board:
-            # Modo actualización: actualiza hilos existentes y descarga nuevos
-            download_board(board_name, args.tema, args.overwrite, args.multithread, args.sleep, update_mode=True)
-        else:
-            # Modo descarga normal
-            download_board(board_name, args.tema, args.overwrite, args.multithread, args.sleep, update_mode=False)
+        download_board(board_name, args.tema, args.overwrite, args.multithread, args.sleep)
     else:
         Console.print_error("❌ URL no válida. Debe ser una URL de 4chan.")
         sys.exit(1)
