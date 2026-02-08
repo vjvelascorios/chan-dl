@@ -20,7 +20,7 @@ Un descargador avanzado de hilos y boards de 4chan con interfaz HTML moderna y m
 
 ```bash
 # Python 3.7+ y pip
-pip install basc-py4chan gallery-dl tqdm pathlib
+pip install basc_py4chan gallery-dl tqdm pathlib
 ```
 
 ### Verificar instalación
@@ -132,11 +132,12 @@ python 4chandlv15.py --config-show
 │   │   └── media/
 │   │       ├── image1.jpg
 │   │       ├── video1.webm
+│   │       ├── info.json             # Metadatos (mejorable)
 │   │       └── ...
 │   └── another_thread/
 │       └── ...
 └── another_board/
-    └── ...
+  └── ...
 ```
 
 ## Ejemplos de Uso Avanzado
@@ -293,6 +294,13 @@ Para reportar bugs o sugerir mejoras, crear un issue con:
 - Comando ejecutado
 - Error completo
 - Sistema operativo
+
+### Migración recomendada
+Para flujos avanzados y mejor modularidad, usa el paquete `cli/chan_downloader/` y ejecuta desde ahí:
+
+```bash
+python -m chan_downloader.cli "https://boards.4chan.org/g/thread/12345678"
+```
 
 ## Licencia
 

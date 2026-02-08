@@ -2,3 +2,4 @@ basc-py4chan
 # requests
 tqdm
 gallery-dl
+basc_py4chan

@@ -161,12 +161,29 @@ def create_thread_html(thread, board_name, thread_id, thread_subject, downloaded
     """Genera HTML mejorado con mejor información y estilos."""
     media_info = get_media_info(os.path.join(BASE_DOWNLOAD_DIR, board_name, f"{thread_id}_{sanitize_filename(thread_subject)}", MEDIA_SUBFOLDER))
     reading_time = calculate_reading_time(thread)
-    
+
+    # Cargar metadatos info.json para mejorar el matching
+    info_json_path = os.path.join(BASE_DOWNLOAD_DIR, board_name, f"{thread_id}_{sanitize_filename(thread_subject)}", MEDIA_SUBFOLDER, "info.json")
+    post_file_map = {}
+    if os.path.exists(info_json_path):
+        try:
+            with open(info_json_path, "r", encoding="utf-8") as f:
+                info_data = json.load(f)
+            # Mapear post_id a filename
+            for entry in info_data.get("entries", []):
+                pid = entry.get("post_id")
+                fname = entry.get("filename")
+                ext = entry.get("extension")
+                if pid and fname and ext:
+                    post_file_map[str(pid)] = f"{fname}.{ext}"
+        except Exception:
+            pass
+
     html_content = f"""<!DOCTYPE html>
-<html lang="es">
+<html lang=\"es\">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset=\"UTF-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
     <title>/{board_name}/ - {thread_subject} ({thread_id})</title>
     <style>
         :root {{
@@ -175,7 +192,7 @@ def create_thread_html(thread, board_name, thread_id, thread_subject, downloaded
             --warning-color: #ffc107;
             --danger-color: #dc3545;
         }}
-        body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 1em; line-height: 1.6; transition: all 0.3s ease; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; margin: 0; padding: 1em; line-height: 1.6; transition: all 0.3s ease; }}
         .container {{ max-width: 900px; margin: 0 auto; padding: 1em; }}
         .thread-info {{ background: rgba(255,255,255,0.1); padding: 1em; border-radius: 8px; margin-bottom: 1em; }}
         .stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1em; font-size: 0.9em; }}
@@ -194,22 +211,18 @@ def create_thread_html(thread, board_name, thread_id, thread_subject, downloaded
         .theme-toggle {{ position: fixed; top: 20px; right: 20px; padding: 10px 15px; border-radius: 25px; border: none; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: all 0.3s; z-index: 1000; }}
         .theme-toggle:hover {{ transform: scale(1.05); }}
         footer {{ text-align: center; margin-top: 3em; padding: 2em 0; border-top: 2px solid; font-size: 0.85em; opacity: 0.7; }}
-        
         /* Temas */
         body.light-theme {{ background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); color: #2c3e50; }}
         .light-theme .post {{ background: rgba(255,255,255,0.9); border-color: #e1e8ed; }}
         .light-theme .post-id {{ color: #e74c3c; }}
         .light-theme .theme-toggle {{ background: #34495e; color: white; }}
         .light-theme footer {{ border-color: #bdc3c7; }}
-        
         body.dark-theme {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ecf0f1; }}
         .dark-theme .post {{ background: rgba(44,62,80,0.9); border-color: #34495e; }}
         .dark-theme .post-id {{ color: #e67e22; }}
         .dark-theme .theme-toggle {{ background: #ecf0f1; color: #2c3e50; }}
         .dark-theme footer {{ border-color: #34495e; }}
-        
         .quote {{ color: #27ae60; font-style: italic; }}
-        
         @media (max-width: 768px) {{
             .container {{ padding: 0.5em; }}
             .stats {{ grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.8em; }}
@@ -247,11 +260,10 @@ def create_thread_html(thread, board_name, thread_id, thread_subject, downloaded
             </div>
         </div>
     """
-    
-    # Crear un conjunto para rastrear archivos ya utilizados
+
     used_files = set()
     available_files = list(downloaded_files)
-    
+
     for post in thread.all_posts:
         html_content += f"""
         <div class="post">
@@ -261,38 +273,41 @@ def create_thread_html(thread, board_name, thread_id, thread_subject, downloaded
             </div>
             <div class="post-comment">
         """
-        
-        if post.has_file and post.file:
-            actual_filename = None
+
+        actual_filename = None
+        # Matching por info.json
+        if post_file_map and str(post.post_id) in post_file_map:
+            actual_filename = post_file_map[str(post.post_id)]
+            if actual_filename not in available_files:
+                actual_filename = None
+
+        # Fallback: matching por nombre y extensión
+        if not actual_filename and post.has_file and post.file:
             remaining_files = [f for f in available_files if f not in used_files]
-            
-            # Improved file matching logic
             for downloaded_file in remaining_files:
                 if (post.file.filename in downloaded_file and 
                     post.file.file_extension.lower() in downloaded_file.lower()):
                     actual_filename = downloaded_file
                     break
-            
             if not actual_filename:
                 for downloaded_file in remaining_files:
                     if os.path.splitext(downloaded_file)[1].lower() == post.file.file_extension.lower():
                         actual_filename = downloaded_file
                         break
-            
-            if actual_filename:
-                used_files.add(actual_filename)
-                file_path_relative = f"{MEDIA_SUBFOLDER}/{actual_filename}"
-                file_extension = os.path.splitext(actual_filename)[1].lower()
-                
-                html_content += '<div class="media-container">'
-                if file_extension in ['.webm', '.mp4', '.mov']:
-                    html_content += f'<video controls muted loop preload="metadata"><source src="{file_path_relative}" type="video/{file_extension[1:]}"></video>'
-                else:
-                    html_content += f'<a href="{file_path_relative}" target="_blank"><img src="{file_path_relative}" alt="{actual_filename}" loading="lazy"></a>'
-                html_content += '</div>'
-        
+
+        if actual_filename:
+            used_files.add(actual_filename)
+            file_path_relative = f"{MEDIA_SUBFOLDER}/{actual_filename}"
+            file_extension = os.path.splitext(actual_filename)[1].lower()
+            html_content += '<div class="media-container">'
+            if file_extension in ['.webm', '.mp4', '.mov']:
+                html_content += f'<video controls muted loop preload="metadata"><source src="{file_path_relative}" type="video/{file_extension[1:]}"></video>'
+            else:
+                html_content += f'<a href="{file_path_relative}" target="_blank"><img src="{file_path_relative}" alt="{actual_filename}" loading="lazy"></a>'
+            html_content += '</div>'
+
         html_content += f"{post.comment}</div></div>"
-    
+
     html_content += f"""
         <footer>
             <p>Generado por 4chan Downloader v16.2 - <a href="https://github.com" target="_blank">GitHub</a></p>
@@ -300,39 +315,10 @@ def create_thread_html(thread, board_name, thread_id, thread_subject, downloaded
         </footer>
     </div>
     <script>
-        const toggle = document.getElementById('theme-toggle');
-        const body = document.body;
-        
-        function setTheme(theme) {{
-            body.className = theme + '-theme';
-            toggle.textContent = theme === 'light' ? '🌙' : '☀️';
-            localStorage.setItem('4chan-theme', theme);
-        }}
-        
-        toggle.addEventListener('click', () => {{
-            const current = body.classList.contains('light-theme') ? 'light' : 'dark';
-            setTheme(current === 'light' ? 'dark' : 'light');
-        }});
-        
-        // Load saved theme
-        const saved = localStorage.getItem('4chan-theme') || '{initial_theme}';
-        setTheme(saved);
-        
-        // Add image click to expand
-        document.querySelectorAll('img').forEach(img => {{
-            img.addEventListener('click', () => {{
-                if (img.style.maxWidth === 'none') {{
-                    img.style.maxWidth = '100%';
-                    img.style.maxHeight = '500px';
-                }} else {{
-                    img.style.maxWidth = 'none';
-                    img.style.maxHeight = 'none';
-                }}
-            }});
-        }});
+        ...existing code...
     </script>
 </body></html>"""
-    
+
     return html_content
 
 def create_board_index(board_name, results, config):
